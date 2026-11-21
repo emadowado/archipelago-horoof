@@ -217,7 +217,34 @@ async function load() {
     save();
     console.log("Admin password updated from ADMIN_PASSWORD.");
   }
+  ensureRequestedAccounts();
   console.log(`Storage: ${STORAGE}`);
+}
+// Idempotent data migration: accounts Emad asked for. Only adds what is missing, never overwrites.
+function ensureRequestedAccounts() {
+  let changed = false;
+  const TEAM = "قراصنة مدار";
+  let team = S.teams.find((t) => normName(t.name) === normName(TEAM));
+  if (!team) {
+    const used = new Set(S.teams.map((t) => t.flag));
+    const flags = fs.readdirSync(path.join(PUB, "flags")).filter((f) => f.endsWith(".svg")).map((f) => "/flags/" + f);
+    const taken = new Set(S.teams.map((t) => t.island));
+    const isle = G.ISLANDS.find((i) => i.type !== "rare" && i.type !== "mystery" && i.region === "beginnings" && !taken.has(i.id)) || G.islandById("marina");
+    team = {
+      id: "t" + rid(4), name: TEAM, ship: "brig", flag: flags.find((f) => !used.has(f)) || flags[0], island: isle.id,
+      energy: G.RULES.START_ENERGY, coins: 0, treasures: { shell: 0, chest: 0, crown: 0 }, code: joinCode(), move: null, created: now()
+    };
+    S.teams.push(team);
+    S.log.push({ id: rid(6), ts: now(), day: S.day, teamId: team.id, type: "info", note: `طاقم جديد: ${TEAM}`, by: "النظام" });
+    changed = true;
+  }
+  const key = normName("1");
+  const u = S.players.find((x) => x.key === key);
+  if (!u) {
+    S.players.push({ id: "p" + rid(5), name: "1", key, pin: hashPin("11"), teamId: team.id, role: "player", created: now() });
+    changed = true;
+  } else if (!u.teamId && u.role !== "admin") { u.teamId = team.id; changed = true; }
+  if (changed) { S.v++; save(); console.log("Requested accounts ensured."); }
 }
 function save() { store.save(S); }
 function commit() {
@@ -649,9 +676,10 @@ async function api(req, res, url) {
           }
         } else {
           const n = cleanText(b.name, 24);
-          if (n.length < 2) return err(res, 400, "اسم قصير");
+          // the captain may create short names / short PINs on purpose (self-signup still needs 4–8 digits)
+          if (n.length < 1) return err(res, 400, "اسم قصير");
           if (S.players.some((x) => x.key === normName(n))) return err(res, 409, "الاسم مأخوذ");
-          if (!validPin(b.pin)) return err(res, 400, "الرمز من 4 إلى 8 أرقام");
+          if (!/^[0-9]{2,8}$/.test(String(b.pin || ""))) return err(res, 400, "الرمز من 2 إلى 8 أرقام");
           if (b.teamId && !findTeam(b.teamId)) return err(res, 404, "الطاقم غير موجود");
           if (b.teamId && S.players.filter((x) => x.teamId === b.teamId).length >= 2) return err(res, 400, "الطاقم مكتمل");
           S.players.push({ id: "p" + rid(5), name: n, key: normName(n), pin: hashPin(b.pin), teamId: b.teamId || null, role: "player", created: now() });

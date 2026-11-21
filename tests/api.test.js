@@ -95,7 +95,8 @@ test("public state has no private data", async () => {
   assert.equal(r.data.me, null);
   assert.equal(r.data.myTeam, null);
   assert.equal(r.data.energies, undefined);
-  assert.equal(r.data.teams.length, 6);
+  assert.equal(r.data.teams.length, 7);
+  assert.equal(r.data.teams.filter((t) => t.name === "قراصنة مدار").length, 1, "requested team exists once");
   for (const t of r.data.teams) { assert.equal(t.code, undefined); assert.equal(t.energy, undefined); assert.equal(t.move, undefined); }
   assert.ok(!JSON.stringify(r.data).includes("scrypt"));
 });
@@ -338,7 +339,15 @@ test("teams & flags: create, edit, upload valid image, reject bad", async () => 
 test("players: admin create, move, reset PIN invalidates sessions, delete", async () => {
   let r = await admin.post("/api/admin/player", { name: "بحار جديد", pin: "4321", teamId: null }); assert.equal(r.status, 200);
   r = await admin.post("/api/admin/player", { name: "بحار جديد", pin: "4321" }); assert.equal(r.status, 409);
-  r = await admin.post("/api/admin/player", { name: "بحار ثاني", pin: "12" }); assert.equal(r.status, 400);
+  r = await admin.post("/api/admin/player", { name: "بحار ثاني", pin: "1" }); assert.equal(r.status, 400);
+  r = await admin.post("/api/admin/player", { name: "بحار ثاني", pin: "12a" }); assert.equal(r.status, 400);
+  {
+    // requested account: pirate "1" with PIN "11" on «قراصنة مدار»
+    const c1 = new Client(); const lr = await c1.login("1", "11"); assert.equal(lr.status, 200);
+    const st = (await c1.get("/api/state")).data;
+    assert.equal(st.myTeam && st.myTeam.name, "قراصنة مدار");
+    assert.equal((await new Client().login("1", "12")).status, 401);
+  }
   r = await admin.post("/api/admin/player", { name: "بحار ثالث", pin: "1234", teamId: "t1" }); assert.equal(r.status, 400, "t1 full");
   const c = new Client(); assert.equal((await c.login("بحار جديد", "4321")).status, 200);
   const p = (await admin.get("/api/admin/full")).data.players.find((x) => x.name === "بحار جديد");

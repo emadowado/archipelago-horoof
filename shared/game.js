@@ -18,7 +18,8 @@
 
   const TREASURE_NAMES = { shell: "كنز الصدفة", chest: "كنز الصندوق", crown: "كنز التاج" };
 
-  const MAP = { W: 1400, H: 1400, CX: 700, CY: 700, SEA_R: 600, INNER_R: 330, OUTER_R: 495 };
+  // World is ~2x the old 1400 map so there is real open water between islands
+  const MAP = { W: 2800, H: 2800, CX: 1400, CY: 1400, SEA_R: 1220, INNER_R: 700, OUTER_R: 1040, K: 2 };
 
   const REGIONS = {
     beginnings: { id: "beginnings", name: "بحر البدايات", order: 0, a0: 210, a1: 330, color: "#3ad1b6" },
@@ -97,20 +98,44 @@
     ISLANDS.forEach((i) => by[i.region] && by[i.region].push(i));
     for (const [rid, list] of Object.entries(by)) {
       const r = REGIONS[rid];
-      const pad = 15, u0 = r.a0 + pad, span = r.a1 - r.a0 - pad * 2;
+      const pad = 8, u0 = r.a0 + pad, span = r.a1 - r.a0 - pad * 2;
       list.slice(0, 3).forEach((isle, i) => {
         const t = (i + 0.5) / 3;
-        const p = polar(u0 + span * t + ((hashStr(isle.id) % 7) - 3), MAP.INNER_R + ((hashStr(isle.id + "r") % 25) - 12));
+        const p = polar(u0 + span * t + ((hashStr(isle.id) % 7) - 3), MAP.INNER_R + ((hashStr(isle.id + "r") % 81) - 40));
         Object.assign(isle, { x: Math.round(p.x), y: Math.round(p.y) });
       });
       list.slice(3, 7).forEach((isle, i) => {
         const t = (i + 0.5) / 4;
-        const p = polar(u0 + span * t + ((hashStr(isle.id) % 7) - 3), MAP.OUTER_R + ((hashStr(isle.id + "r") % 21) - 10));
+        const p = polar(u0 + span * t + ((hashStr(isle.id) % 7) - 3), MAP.OUTER_R + ((hashStr(isle.id + "r") % 61) - 30));
         Object.assign(isle, { x: Math.round(p.x), y: Math.round(p.y) });
       });
     }
     const m = ISLANDS.find((i) => i.id === "mystery");
     m.x = MAP.CX; m.y = MAP.CY;
+  })();
+
+  // Decorative scenery scattered in the open water (deterministic, never on top of islands)
+  const SCENERY = (function scenery() {
+    const kinds = [
+      ["rocks", 190], ["stacks", 150], ["wreck", 200], ["sandbar", 230], ["beacon", 150], ["kraken", 150], ["rocks", 150],
+      ["sandbar", 190], ["stacks", 130], ["rocks", 170], ["wreck", 170], ["rocks", 140], ["stacks", 140], ["sandbar", 200]
+    ];
+    let seed = 20271448;
+    const rnd = () => { seed = (Math.imul(seed, 1103515245) + 12345) >>> 0; return seed / 4294967296; };
+    const out = [];
+    let k = 0, tries = 0;
+    while (k < kinds.length && tries < 4000) {
+      tries++;
+      const a = rnd() * 360, r = 300 + rnd() * (MAP.SEA_R - 420);
+      const p = polar(a, r);
+      const okIsle = ISLANDS.every((i) => Math.hypot(i.x - p.x, i.y - p.y) > (i.type === "mystery" ? 380 : 250));
+      const okSc = out.every((o) => Math.hypot(o.x - p.x, o.y - p.y) > 270);
+      const okLine = [210, 330, 90].every((d) => Math.abs(((a - d + 540) % 360) - 180) > 5);
+      if (!okIsle || !okSc || !okLine) continue;
+      const [kind, w] = kinds[k++];
+      out.push({ kind, w, x: Math.round(p.x), y: Math.round(p.y), flip: rnd() < 0.5 });
+    }
+    return out;
   })();
 
   const islandById = (id) => ISLANDS.find((i) => i.id === id);
@@ -150,7 +175,7 @@
     return Number(n || 0).toLocaleString("ar-SA");
   }
 
-  const api = { RULES, RESULT_GOLD, TREASURE_NAMES, MAP, REGIONS, ISLANDS, TYPE_LABELS, polar, islandById, travelCost, islandVisible, islandReward, teamTotal, fmt };
+  const api = { RULES, RESULT_GOLD, TREASURE_NAMES, MAP, REGIONS, ISLANDS, SCENERY, TYPE_LABELS, polar, islandById, travelCost, islandVisible, islandReward, teamTotal, fmt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.GAME = api;
 })(typeof window !== "undefined" ? window : globalThis);

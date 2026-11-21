@@ -130,7 +130,7 @@ async function run() {
   await p.tap("#btn-board"); await p.waitForSelector(".board-row"); await p.waitForTimeout(900);
   const totals = await p.$$eval(".board-row .row-gold b", (els) => els.map((e) => e.textContent));
   ok(await p.locator(".board-row.is-first .rank img").count() === 1, "#1 row has golden anchor");
-  ok(totals.length === 6, "leaderboard lists 6 teams");
+  ok(totals.length >= 7, "leaderboard lists all teams (6 seeded + قراصنة مدار)");
   await p.screenshot({ path: path.join(SHOTS, "final-leaderboard-mobile.png") });
   await audit(p, "leaderboard mobile");
   await p.tap("#sheet-close"); await p.waitForTimeout(400);
@@ -171,7 +171,7 @@ async function run() {
   await p.waitForTimeout(400);
   ok((await p.locator(".cinema-banner").count()) === 1 || (await p.locator(".ship.is-sailing").count()) > 0, "reveal plays banner / sailing animation");
   await p.waitForTimeout(3200);
-  const shipAtDawn = await p.evaluate(() => { const el = document.querySelector(".ship.is-mine"); const isle = GAME.islandById("dawn"); return Math.hypot(parseFloat(el.style.left) - isle.x, parseFloat(el.style.top) - isle.y) < 190; });
+  const shipAtDawn = await p.evaluate(() => { const el = document.querySelector(".ship.is-mine"); const isle = GAME.islandById("dawn"); return Math.hypot(parseFloat(el.style.left) - isle.x, parseFloat(el.style.top) - isle.y) < 420; });
   ok(shipAtDawn, "ship rests next to the new island after animation");
   const after = await p.evaluate(() => ({ total: APP.st.myTeam.total, energy: APP.st.myTeam.energy }));
   ok(after.total === goldBefore + 3000 + 2000, "first-visit reward +2,000 added (power island)", JSON.stringify(after));
@@ -210,6 +210,32 @@ async function run() {
   await p.tap("#btn-spectate"); await p.waitForSelector("#view-game:not([hidden])"); await p.waitForTimeout(600);
   ok((await p.textContent("#hud")).includes("تتفرج"), "spectator mode works without login");
 
+  /* ═══ requested account 1 / 11 (قراصنة مدار): own-ship dock bottom-right ═══ */
+  {
+    const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    const q = await mctx.newPage(); track(q, "pirate-1");
+    await q.goto(BASE); await q.waitForSelector("#view-login:not([hidden])");
+    await q.fill("#login-name", "1"); await q.fill("#login-pin", "11"); await q.tap("#btn-login");
+    await q.waitForSelector("#view-game:not([hidden])"); await q.waitForTimeout(1600);
+    ok(await q.isVisible("#my-dock"), "account 1/11 logs in and sees own-ship dock");
+    ok((await q.textContent("#my-dock")).includes("قراصنة مدار"), "dock shows team «قراصنة مدار»");
+    const geo = await q.evaluate(() => {
+      const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+      return { dock: r("#my-dock"), hud: r("#hud"), tools: [...document.querySelectorAll(".map-tools .tool-btn, #btn-board, #btn-menu")].filter((e) => e.offsetParent).map((e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; }), vw: innerWidth };
+    });
+    const ov = (a, c) => Math.min(a.r, c.r) > Math.max(a.l, c.l) && Math.min(a.b, c.b) > Math.max(a.t, c.t);
+    ok(geo.dock.r >= geo.vw - 20 && !ov(geo.dock, geo.hud) && !geo.tools.some((t) => ov(geo.dock, t)), "dock is bottom-right and covers no buttons", JSON.stringify(geo));
+    const sc = await q.evaluate(() => APP.view.scale);
+    ok(sc > 0.25, "phone opens zoomed in on own ship (not the tiny overview)", String(sc));
+    await q.screenshot({ path: path.join(SHOTS, "r2-map-mobile.png") });
+    await q.tap("#my-dock"); await q.waitForSelector("#sheet.is-open"); await q.waitForTimeout(900);
+    ok((await q.textContent("#sheet-body")).includes("قراصنة مدار"), "tapping dock opens own ship sheet");
+    const centered = await q.evaluate(() => { const el = document.querySelector(".ship.is-mine .ship-body"); const b = el.getBoundingClientRect(); return b.left > 0 && b.right < innerWidth && b.top > 60 && b.bottom < innerHeight; });
+    ok(centered, "map centres on own ship when dock is tapped");
+    await q.screenshot({ path: path.join(SHOTS, "r2-myship-mobile.png") });
+    await mctx.close();
+  }
+
   /* ═══ LAPTOP (1440x900) ═══ */
   const lctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.5 });
   const l = await lctx.newPage(); track(l, "player-laptop");
@@ -219,6 +245,7 @@ async function run() {
   await l.fill("#login-name", "تجربة"); await l.fill("#login-pin", "2027"); await l.click("#btn-login");
   await l.waitForSelector("#view-game:not([hidden])"); await l.waitForTimeout(1500);
   await l.screenshot({ path: path.join(SHOTS, "final-map-laptop.png") });
+  await l.screenshot({ path: path.join(SHOTS, "r2-map-laptop.png") });
   await audit(l, "map laptop");
   await mapAudit(l, "map laptop");
   // wheel zoom and drag pan

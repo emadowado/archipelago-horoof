@@ -162,7 +162,7 @@ app.logout = logout;
 function enterGame() {
   $("#view-login").hidden = true;
   $("#view-game").hidden = false;
-  if (!app.built) { buildMap(); bindGestures(); app.built = true; requestAnimationFrame(() => fitView(false)); }
+  if (!app.built) { buildMap(); bindGestures(); app.built = true; requestAnimationFrame(() => initialView()); }
   app.seen.reveal = app.st.lastReveal ? app.st.lastReveal.seq : 0;
   app.seen.whale = app.st.whale.seq;
   renderAll(null);
@@ -188,6 +188,7 @@ function arcPath(a0, a1, r, sweep) {
   const large = Math.abs(a1 - a0) > 180 ? 1 : 0;
   return `M${p0.x.toFixed(1)},${p0.y.toFixed(1)} A${r},${r} 0 ${large} ${sweep} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`;
 }
+const FK = MAP.W / 1400; // scale factor vs the original 1400px chart
 function buildMap() {
   const svg = $("#map-svg");
   svg.innerHTML = "";
@@ -214,12 +215,12 @@ function buildMap() {
   // rhumb lines (old-map compass lines)
   const rh = S("g", { stroke: "#f6e3a8", "stroke-width": 1, opacity: 0.13 }, sea);
   for (let i = 0; i < 32; i++) { const p = G.polar(i * 11.25, MAP.SEA_R); S("line", { x1: MAP.CX, y1: MAP.CY, x2: p.x, y2: p.y }, rh); }
-  S("circle", { cx: MAP.CX, cy: MAP.CY, r: 412, fill: "none", stroke: "#f6e3a8", "stroke-width": 1.5, "stroke-dasharray": "2 10", opacity: 0.35 }, sea);
-  S("circle", { cx: MAP.CX, cy: MAP.CY, r: 560, fill: "none", stroke: "#f6e3a8", "stroke-width": 1, opacity: 0.25 }, sea);
+  S("circle", { cx: MAP.CX, cy: MAP.CY, r: MAP.SEA_R * 0.69, fill: "none", stroke: "#f6e3a8", "stroke-width": 1.5, "stroke-dasharray": "2 10", opacity: 0.35 }, sea);
+  S("circle", { cx: MAP.CX, cy: MAP.CY, r: MAP.SEA_R * 0.93, fill: "none", stroke: "#f6e3a8", "stroke-width": 1, opacity: 0.25 }, sea);
   // sector dividers
   for (const id of ["beginnings", "danger", "edge"]) {
     const r = REGIONS[id];
-    const a = G.polar(r.a0, 175), b = G.polar(r.a0, MAP.SEA_R);
+    const a = G.polar(r.a0, 175 * FK), b = G.polar(r.a0, MAP.SEA_R);
     S("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: "#2a1606", "stroke-width": 7, opacity: 0.35, "stroke-linecap": "round" }, sea);
     S("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: "url(#goldLine)", "stroke-width": 3, "stroke-dasharray": "14 10", "stroke-linecap": "round", opacity: 0.9 }, sea);
   }
@@ -228,23 +229,23 @@ function buildMap() {
     const r = REGIONS[id];
     const mid = (r.a0 + r.a1) / 2;
     const upper = Math.sin((mid * Math.PI) / 180) > 0;
-    const rr = upper ? 642 : 658;
+    const rr = upper ? MAP.SEA_R + 42 * FK : MAP.SEA_R + 58 * FK;
     const d = upper ? arcPath(mid + 40, mid - 40, rr, 1) : arcPath(mid - 40, mid + 40, rr, 0);
     S("path", { id: "arc-" + id, d, fill: "none" }, defs);
-    for (const [stroke, sw, fill] of [["#f3e2bd", 8, "#f3e2bd"], [null, 0, "#4a2a0c"]]) {
+    for (const [stroke, sw, fill] of [["#f3e2bd", 8 * FK, "#f3e2bd"], [null, 0, "#4a2a0c"]]) {
       const t = S("text", { class: "region-arc", "text-anchor": "middle", fill, "dominant-baseline": "middle" }, svg);
       if (stroke) { t.setAttribute("stroke", stroke); t.setAttribute("stroke-width", sw); t.setAttribute("stroke-linejoin", "round"); }
       const tp = S("textPath", { href: "#arc-" + id, startOffset: "50%" }, t);
       tp.textContent = r.name;
     }
     // little gold diamonds flanking the name
-    for (const off of [-13, 13]) {
-      const p = G.polar(mid + off * (upper ? 1 : -1) * (upper ? 1 : 1), rr);
-      S("path", { d: `M${p.x},${p.y - 9} L${p.x + 7},${p.y} L${p.x},${p.y + 9} L${p.x - 7},${p.y} Z`, fill: r.color, stroke: "#4a2a0c", "stroke-width": 2 }, svg);
+    for (const off of [-19, 19]) {
+      const p = G.polar(mid + off * (upper ? 1 : -1), rr);
+      S("path", { d: `M${p.x},${p.y - 9 * FK} L${p.x + 7 * FK},${p.y} L${p.x},${p.y + 9 * FK} L${p.x - 7 * FK},${p.y} Z`, fill: r.color, stroke: "#4a2a0c", "stroke-width": 2 * FK }, svg);
     }
   }
   // compass rose (bottom-left corner)
-  const cg = S("g", { transform: "translate(150 1250)", opacity: 0.9 }, svg);
+  const cg = S("g", { transform: `translate(${150 * FK} ${MAP.H - 150 * FK}) scale(${FK})`, opacity: 0.9 }, svg);
   S("circle", { r: 78, fill: "rgba(90,55,18,.08)", stroke: "#6b4520", "stroke-width": 2 }, cg);
   S("circle", { r: 64, fill: "none", stroke: "#6b4520", "stroke-width": 1, "stroke-dasharray": "3 4" }, cg);
   for (let i = 0; i < 8; i++) {
@@ -256,15 +257,30 @@ function buildMap() {
   S("circle", { r: 7, fill: "#d9a033", stroke: "#5a3712", "stroke-width": 2 }, cg);
   const n = S("text", { y: -86, "text-anchor": "middle", "font-family": "Lalezar", "font-size": 26, fill: "#5a3712" }, cg); n.textContent = "ش";
   // cartouche (top-right)
-  const ct = S("g", { transform: "translate(1205 122)" }, svg);
+  const ct = S("g", { transform: `translate(${MAP.W - 195 * FK} ${122 * FK}) scale(${FK})` }, svg);
   S("path", { d: "M-128,-40 Q-140,-40 -140,-28 L-140,28 Q-140,40 -128,40 L128,40 Q140,40 140,28 L140,-28 Q140,-40 128,-40 Z", fill: "rgba(250,236,200,.75)", stroke: "#6b4520", "stroke-width": 2.5 }, ct);
   S("path", { d: "M-130,-31 L130,-31 M-130,31 L130,31", stroke: "#b8862a", "stroke-width": 1.2 }, ct);
   const t1 = S("text", { y: -2, "text-anchor": "middle", "font-family": "Lalezar", "font-size": 34, fill: "#4a2c0e" }, ct); t1.textContent = "أرخبيل الحروف";
   const t2 = S("text", { y: 24, "text-anchor": "middle", "font-family": "El Messiri", "font-weight": 700, "font-size": 15, fill: "#7a5428" }, ct); t2.textContent = "خريطة حروف مع عماد • ١٤٤٨";
   // corner ornaments
   const orn = (x, y, src, w) => { const im = S("image", { href: src, x: x - w / 2, y: y - w / 2, width: w, height: w, opacity: 0.85 }, svg); return im; };
-  orn(118, 128, "/img/anchor.webp", 120);
-  orn(1278, 1268, "/img/chest.webp", 120);
+  orn(118 * FK, 128 * FK, "/img/anchor.webp", 120 * FK);
+  orn(MAP.W - 122 * FK, MAP.H - 132 * FK, "/img/chest.webp", 120 * FK);
+  // waves & foam: little painted wave glyphs and foam rings in the open water (static = cheap)
+  const wv = S("g", { fill: "none", stroke: "#e9fbff", "stroke-linecap": "round", opacity: 0.5 }, sea);
+  let sd = 77;
+  const rnd = () => { sd = (Math.imul(sd, 1103515245) + 12345) >>> 0; return sd / 4294967296; };
+  const clearOf = (x, y, d) => ISLANDS.every((i) => Math.hypot(i.x - x, i.y - y) > d) && G.SCENERY.every((o) => Math.hypot(o.x - x, o.y - y) > d * 0.8);
+  for (let n = 0, tries = 0; n < 70 && tries < 2000; tries++) {
+    const p = G.polar(rnd() * 360, 240 + rnd() * (MAP.SEA_R - 300));
+    if (!clearOf(p.x, p.y, 150)) continue;
+    n++;
+    const s = 0.8 + rnd() * 0.9, w = 26 * s;
+    S("path", { d: `M${p.x - w},${p.y} q${w / 2},${-10 * s} ${w},0 t${w},0`, "stroke-width": 3.2 * s }, wv);
+    if (n % 3 === 0) S("path", { d: `M${p.x - w * 0.6},${p.y + 14 * s} q${w * 0.3},${-7 * s} ${w * 0.6},0 t${w * 0.6},0`, "stroke-width": 2.4 * s, opacity: 0.7 }, wv);
+  }
+  for (const o of G.SCENERY) S("ellipse", { cx: o.x, cy: o.y + o.w * 0.18, rx: o.w * 0.62, ry: o.w * 0.24, fill: "none", stroke: "#f2fdff", "stroke-width": 3, "stroke-dasharray": "10 14", opacity: 0.35 }, sea);
+  buildScenery();
 
   // islands
   const layer = $("#islands-layer");
@@ -273,12 +289,55 @@ function buildMap() {
     const el = document.createElement("div");
     el.className = "island" + (isle.flip ? " flip" : "") + (isle.type === "rare" ? " is-rare" : "") + (isle.type === "mystery" ? " is-mystery" : "");
     el.dataset.id = isle.id;
-    const w = isle.type === "mystery" ? 300 : isle.type === "rare" ? 168 : 150;
+    const w = isleW(isle);
     el.style.cssText = `left:${isle.x}px;top:${isle.y}px;width:${w}px`;
     el.innerHTML = `<img src="${ART[isle.art]}" alt="" draggable="false" loading="eager" decoding="async"><span class="island-label">${esc(isle.name)}</span>`;
     el.addEventListener("click", (e) => { if (dragGuard()) return; e.stopPropagation(); openIsland(isle.id); });
     layer.appendChild(el);
   }
+}
+
+function isleW(isle) { return isle.type === "mystery" ? 340 : isle.type === "rare" ? 200 : 180; }
+const SCN_ART = { rocks: "/img/sc_rocks.webp", wreck: "/img/sc_wreck.webp", stacks: "/img/sc_stacks.webp", kraken: "/img/sc_kraken.webp", beacon: "/img/sc_beacon.webp", sandbar: "/img/sc_sandbar.webp" };
+function buildScenery() {
+  const layer = $("#scenery-layer");
+  layer.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (const o of G.SCENERY) {
+    const el = document.createElement("div");
+    el.className = `scn kind-${o.kind}${o.flip ? " flip" : ""}`;
+    el.style.cssText = `left:${o.x}px;top:${o.y}px;width:${o.w}px`;
+    el.innerHTML = `<img src="${SCN_ART[o.kind]}" alt="" draggable="false" decoding="async"${o.kind === "kraken" ? ' class="kraken-bob"' : ""}>`;
+    frag.appendChild(el);
+  }
+  // sea mist banks (soft static gradients)
+  let sd = 9;
+  const rnd = () => { sd = (Math.imul(sd, 1103515245) + 12345) >>> 0; return sd / 4294967296; };
+  for (let i = 0; i < 7; i++) {
+    const p = G.polar(i * 51 + rnd() * 30, MAP.SEA_R * (0.55 + rnd() * 0.38));
+    const m = document.createElement("div");
+    m.className = "mist";
+    const w = 420 + rnd() * 320;
+    m.style.cssText = `left:${p.x}px;top:${p.y}px;width:${w}px;height:${w * 0.42}px`;
+    frag.appendChild(m);
+  }
+  // seagull flocks drifting over the sea (transform-only animation)
+  for (const [x, y, d] of [[MAP.CX + 820, MAP.CY - 760, 0], [MAP.CX + 300, MAP.CY + 140, -18], [MAP.CX + 900, MAP.CY + 380, -33]]) {
+    const g = document.createElement("div");
+    g.className = "gulls";
+    g.style.cssText = `left:${x}px;top:${y}px;animation-delay:${d}s`;
+    g.innerHTML = `<img src="/img/sc_gulls.webp" alt="" draggable="false" decoding="async">`;
+    frag.appendChild(g);
+  }
+  layer.appendChild(frag);
+  observeOffscreen($$(".gulls, .scn.kind-kraken", layer));
+}
+/* pause CSS animations of things that are off-screen */
+let offIO = null;
+function observeOffscreen(els) {
+  if (!("IntersectionObserver" in window)) return;
+  if (!offIO) offIO = new IntersectionObserver((ents) => { for (const e of ents) e.target.classList.toggle("off", !e.isIntersecting); }, { root: null, rootMargin: "80px" });
+  els.forEach((el) => offIO.observe(el));
 }
 
 /* ───────── Rendering ───────── */
@@ -289,6 +348,7 @@ function renderAll(prev) {
   renderShips(prev);
   renderRoute();
   renderHud();
+  renderDock();
   if (app.sheetKind) refreshSheet();
 }
 app.renderAll = renderAll;
@@ -324,7 +384,8 @@ function renderIslands() {
 function whalePos() {
   const w = app.st.whale, r = REGIONS[w.region];
   const off = (w.angle % 2 === 0) ? 45 : 75;
-  return G.polar(r.a0 + off, 232);
+  const p = G.polar(r.a0 + off, MAP.INNER_R * 0.62);
+  return p;
 }
 function renderWhale() {
   const layer = $("#whale-layer");
@@ -357,7 +418,7 @@ function shipRect(x, y, name, k) {
   return { l: x - hw, r: x + hw, t: y - 64 * k, b: y + 46 * k };
 }
 function isleRects(isle, lk) {
-  const w = isle.type === "mystery" ? 300 : isle.type === "rare" ? 168 : 150, h = w * 0.92;
+  const w = isleW(isle), h = w * 0.92;
   const body = { l: isle.x - w * 0.36, r: isle.x + w * 0.36, t: isle.y - h * 0.34, b: isle.y + h * 0.3 };
   const el = document.querySelector(`.island[data-id="${isle.id}"]`), lb = el && el.querySelector(".island-label");
   const lw = (lb && lb.offsetWidth ? lb.offsetWidth : textW(isle.name, "800 15px Cairo") + 24) / 2;
@@ -386,11 +447,12 @@ function layoutShips(teams) {
   const wp = app.st.whale ? whalePos() : null;
   const obstacles = [];
   if (wp) obstacles.push({ rc: { l: wp.x - 75, r: wp.x + 75, t: wp.y - 55, b: wp.y + 90 }, w: 3 });
+  for (const o of G.SCENERY) obstacles.push({ rc: { l: o.x - o.w * 0.4, r: o.x + o.w * 0.4, t: o.y - o.w * 0.4, b: o.y + o.w * 0.35 }, w: 0.8 });
   const placed = [], pos = {};
   const order = [...teams].sort((a, b) => a.island.localeCompare(b.island) || a.id.localeCompare(b.id));
   for (const team of order) {
     const home = G.islandById(team.island) || G.islandById("marina");
-    const k = home.type === "mystery" ? 2.1 : 1;
+    const k = (home.type === "mystery" ? 2.3 : 1.15) * Math.max(1, K.ship * 0.75);
     let best = null;
     for (const [dx, dy, pref] of SHIP_CANDS) {
       const x = home.x + dx * k, y = home.y + dy * k;
@@ -430,6 +492,7 @@ function renderShips(prev) {
       el.innerHTML = `<div class="ship-body"><div class="ship-art"></div><div class="ship-name"><span class="nm"></span></div></div>`;
       el.querySelector(".ship-body").addEventListener("click", (e) => { if (dragGuard()) return; e.stopPropagation(); openShip(team.id); });
       layer.appendChild(el);
+      observeOffscreen([el]);
     }
     existing.delete(team.id);
     if (el.dataset.key !== key) { el.querySelector(".ship-art").innerHTML = shipHTML(team, 84, 5); el.dataset.key = key; }
@@ -565,6 +628,27 @@ function renderHud() {
   }
   app.seen.total = mt.total;
 }
+function renderDock() {
+  const dock = $("#my-dock"), mt = myTeam();
+  const hud = $("#hud");
+  if (hud) document.documentElement.style.setProperty("--hud-h", hud.offsetHeight + "px");
+  if (!mt) { dock.hidden = true; dock.dataset.sig = ""; return; }
+  const sig = [mt.id, mt.name, mt.ship, mt.flag, mt.total].join("|");
+  dock.hidden = false;
+  if (dock.dataset.sig === sig) return;
+  dock.dataset.sig = sig;
+  dock.innerHTML = `<span class="dock-ship">${shipHTML(mt, 62, 4)}</span><span class="dock-txt"><span class="dock-tag">سفينتك</span><b>${esc(mt.name)}</b><span class="dock-gold num"><img src="/img/coin.webp" alt="">${fmt(mt.total)}</span></span>`;
+}
+function focusMyShip() {
+  const mt = myTeam(); if (!mt) return;
+  const p = shipPos(mt, app.st.teams);
+  const a = mapArea();
+  const s = Math.max(app.view.scale, window.innerWidth >= 900 ? 0.6 : 0.42);
+  // on phones the ship sheet covers the lower half, so aim the ship into the upper part of the map
+  focusWorld(p.x, p.y + (window.innerWidth < 900 ? (a.h * 0.22) / s : 0), s);
+  openShip(mt.id);
+}
+app.focusMyShip = focusMyShip;
 
 async function chooseMove(dest) {
   try {
@@ -825,6 +909,10 @@ async function refresh() {
       app.me = next.me;
       if (wasMe && !app.me) { toast("انتهت الجلسة، سجّل دخولك مرة ثانية", "err"); showLogin(); return; }
       if ($("#view-game").hidden) return;
+      // Nothing changed? Don't touch the DOM (this is what caused the periodic flicker on phones).
+      const sig = JSON.stringify(next);
+      if (sig === app.lastSig) return;
+      app.lastSig = sig;
       renderAll(prev);
       // cinematic triggers
       if (next.lastReveal && next.lastReveal.seq !== app.seen.reveal) {
@@ -857,28 +945,52 @@ function startRealtime() {
   };
   connect();
   // safety net: polling (also covers proxies that buffer SSE)
-  setInterval(() => { if (!document.hidden) refresh(); }, 8000);
+  setInterval(() => { if (!document.hidden && !isMoving()) refresh(); }, 8000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 }
 
 /* ───────── Pan / zoom ───────── */
 let moved = false, movedAt = 0;
 function dragGuard() { return moved || performance.now() - movedAt < 120; }
+const SHIP_MAX = 2.4, LABEL_MAX = 2.6, FAR_AT = 0.22;
+let viewRaf = 0, lastVars = "", movingT = 0;
+function isMoving() { return $("#world").classList.contains("is-moving"); }
+function markMoving() {
+  const w = $("#world");
+  if (!w.classList.contains("is-moving")) w.classList.add("is-moving");
+  clearTimeout(movingT);
+  movingT = setTimeout(() => { w.classList.remove("is-moving"); applyVars(); }, 220);
+}
+// Gesture frames are coalesced into one write per animation frame.
+function scheduleView() {
+  markMoving();
+  if (viewRaf) return;
+  viewRaf = requestAnimationFrame(() => { viewRaf = 0; applyView(); });
+}
 function applyView() {
   const v = app.view, w = $("#world");
-  w.style.transform = `translate3d(${v.x}px, ${v.y}px, 0) scale(${v.scale})`;
-  w.style.setProperty("--ship-k", clamp(shipBase() / v.scale, 1, 1.75).toFixed(3));
-  w.style.setProperty("--label-k", clamp(0.8 / v.scale, 1, 1.9).toFixed(3));
-  w.classList.toggle("is-far", v.scale < 0.42);
-  const lk = layoutK();
+  w.style.transform = `translate3d(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px, 0) scale(${v.scale.toFixed(4)})`;
+  // the size-compensation variables restyle every island/ship, so only change them in coarse steps
+  // and never mid-gesture (that was the main source of jank while pinching)
+  if (!isMoving()) applyVars();
+}
+function applyVars() {
+  const w = $("#world"), lk = layoutK();
+  const key = lk.ship + "/" + lk.label + "/" + lk.far;
+  if (key !== lastVars) {
+    lastVars = key;
+    w.style.setProperty("--ship-k", lk.ship);
+    w.style.setProperty("--label-k", lk.label);
+    w.classList.toggle("is-far", lk.far);
+  }
   if (app.st && lk.key !== lastLayoutK) { lastLayoutK = lk.key; clearTimeout(applyView.t); applyView.t = setTimeout(() => renderShips(null), 120); }
 }
 let lastLayoutK = "";
 const shipBase = () => (window.innerWidth >= 900 ? 0.55 : 0.5);
 function layoutK() {
   const sc = app.view ? app.view.scale : 0.4;
-  const ship = Math.round(clamp(shipBase() / sc, 1, 1.75) * 10) / 10, label = Math.round(clamp(0.8 / sc, 1, 1.9) * 5) / 5;
-  return { ship, label, far: sc < 0.42, key: ship + "/" + label + "/" + (sc < 0.42) };
+  const ship = Math.round(clamp(shipBase() / sc, 1, SHIP_MAX) * 10) / 10, label = Math.round(clamp(0.8 / sc, 1, LABEL_MAX) * 5) / 5;
+  return { ship, label, far: sc < FAR_AT, key: ship + "/" + label + "/" + (sc < FAR_AT) };
 }
 function mapArea() {
   const vp = $("#viewport");
@@ -892,7 +1004,7 @@ function mapArea() {
 }
 function fitView(anim) {
   const a = mapArea(), v = app.view;
-  const target = a.vw + 416 >= 900 && window.innerWidth >= 900 ? 1340 : 1250;
+  const target = (window.innerWidth >= 900 ? 1340 : 1250) * FK;
   const s = Math.min(a.vw / target, a.h / target);
   v.min = s * 0.9;
   v.max = Math.max(1.6, s * 5);
@@ -920,15 +1032,30 @@ function zoomAt(cx, cy, ns, anim) {
   v.x = cx - (cx - v.x) * (ns / v.scale);
   v.y = cy - (cy - v.y) * (ns / v.scale);
   v.scale = ns;
-  clampView(); setAnim(anim); applyView();
+  clampView(); setAnim(anim);
+  if (anim) applyView(); else scheduleView();
 }
-function focusWorld(x, y, s) {
+// Opening view: phones start zoomed in on your own ship (or the map centre), not the tiny whole-map overview.
+function initialView() {
+  fitView(false);
+  const mt = myTeam(), a = mapArea();
+  if (window.innerWidth >= 900) {
+    if (mt) { const p = shipPos(mt, app.st.teams); focusWorld(p.x, p.y, app.view.scale * 1.5, false); }
+    return;
+  }
+  const s = a.vw / 1100;
+  if (mt) { const p = shipPos(mt, app.st.teams); focusWorld(p.x, p.y, s, false); }
+  else focusWorld(MAP.CX, MAP.CY, a.vw / 1500, false);
+}
+app.initialView = initialView;
+function focusWorld(x, y, s, anim = true) {
   const a = mapArea(), v = app.view;
   v.scale = clamp(s, v.min, v.max);
   v.x = a.vw / 2 - x * v.scale;
   v.y = a.top + a.h / 2 - y * v.scale;
-  clampView(); setAnim(true); applyView();
+  clampView(); setAnim(anim); applyView();
 }
+app.focusWorld = focusWorld;
 function bindGestures() {
   const vp = $("#viewport");
   const pts = new Map();
@@ -952,7 +1079,7 @@ function bindGestures() {
       if (!moved && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 7) return;
       if (!moved) { moved = true; vp.classList.add("is-panning"); try { vp.setPointerCapture(e.pointerId); } catch {} }
       app.view.x += dx; app.view.y += dy; last = { x: e.clientX, y: e.clientY };
-      clampView(); applyView();
+      clampView(); scheduleView();
     }
   }, { passive: true });
   const end = (e) => {
@@ -980,7 +1107,18 @@ function bindGestures() {
     zoomAt(e.clientX - rect.left, e.clientY - rect.top, app.view.scale * f);
   }, { passive: false });
   vp.addEventListener("dblclick", (e) => { if (e.target.closest(".island,.ship-body,.whale")) return; const rect = vp.getBoundingClientRect(); zoomAt(e.clientX - rect.left, e.clientY - rect.top, app.view.scale * 1.8, true); });
-  window.addEventListener("resize", () => { clearTimeout(bindGestures.rt); bindGestures.rt = setTimeout(() => fitView(false), 120); });
+  // Phones fire resize when the URL bar shows/hides: only re-fit on a real width change, otherwise just keep the view in bounds.
+  let lastW = window.innerWidth;
+  window.addEventListener("resize", () => {
+    clearTimeout(bindGestures.rt);
+    bindGestures.rt = setTimeout(() => {
+      const v = app.view, a = mapArea();
+      if (Math.abs(window.innerWidth - lastW) > 40) { lastW = window.innerWidth; fitView(false); return; }
+      const t = (window.innerWidth >= 900 ? 1340 : 1250) * FK;
+      v.min = Math.min(a.vw / t, a.h / t) * 0.9;
+      clampView(); applyView();
+    }, 150);
+  });
 }
 
 function bindGameChrome() {
@@ -989,7 +1127,8 @@ function bindGameChrome() {
   $("#zoom-in").addEventListener("click", () => { const a = mapArea(); zoomAt(a.vw / 2, a.top + a.h / 2, app.view.scale * 1.5, true); });
   $("#zoom-out").addEventListener("click", () => { const a = mapArea(); zoomAt(a.vw / 2, a.top + a.h / 2, app.view.scale / 1.5, true); });
   $("#zoom-fit").addEventListener("click", () => fitView(true));
-  $("#zoom-me").addEventListener("click", () => { const mt = myTeam(); if (!mt) return; const p = shipPos(mt, app.st.teams); focusWorld(p.x, p.y, Math.max(app.view.scale, 0.9)); });
+  $("#zoom-me").addEventListener("click", () => { const mt = myTeam(); if (!mt) return; const p = shipPos(mt, app.st.teams); focusWorld(p.x, p.y, Math.max(app.view.scale, window.innerWidth >= 900 ? 0.6 : 0.45)); });
+  $("#my-dock").addEventListener("click", focusMyShip);
   $("#scrim").addEventListener("click", closeSheet);
   $("#sheet-close").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });

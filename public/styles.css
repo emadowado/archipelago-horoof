@@ -128,14 +128,14 @@ img { -webkit-user-drag: none; user-select: none; }
 .flag { position: absolute; display: flex; flex-direction: row-reverse; pointer-events: none; }
 .flag i {
   flex: 1 1 0; height: 100%; background-repeat: no-repeat; display: block; margin-left: -0.6px;
-  animation: flagWave 1.6s ease-in-out infinite; transform-origin: 50% 0; will-change: transform;
+  animation: flagWave 1.6s ease-in-out infinite; transform-origin: 50% 0;
 }
 .flag i:first-child { border-radius: 0 1px 1px 0; }
 .flag i:last-child { border-radius: 2px 0 0 2px; }
 @keyframes flagWave {
-  0%, 100% { transform: translateY(0) skewY(0deg); filter: brightness(1); }
-  25% { transform: translateY(calc(var(--amp) * -1)) skewY(calc(var(--sk) * 1deg)); filter: brightness(1.1); }
-  75% { transform: translateY(var(--amp)) skewY(calc(var(--sk) * -1deg)); filter: brightness(.88); }
+  0%, 100% { transform: translateY(0) skewY(0deg); }
+  25% { transform: translateY(calc(var(--amp) * -1)) skewY(calc(var(--sk) * 1deg)); }
+  75% { transform: translateY(var(--amp)) skewY(calc(var(--sk) * -1deg)); }
 }
 
 /* Forms */
@@ -177,7 +177,8 @@ img { -webkit-user-drag: none; user-select: none; }
 .view-game { background: radial-gradient(circle at 50% 45%, #0d2a36, var(--night) 75%); }
 .viewport { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; }
 .viewport.is-panning { cursor: grabbing; }
-.world { position: absolute; left: 0; top: 0; width: 1400px; height: 1400px; transform-origin: 0 0; will-change: transform; }
+.world { position: absolute; left: 0; top: 0; width: 2800px; height: 2800px; transform-origin: 0 0; backface-visibility: hidden; }
+.world.is-moving { will-change: transform; }
 .world.is-anim { transition: transform .6s var(--ease-out); }
 
 .map-paper { position: absolute; inset: 0; border-radius: 26px;
@@ -187,17 +188,32 @@ img { -webkit-user-drag: none; user-select: none; }
   box-shadow: 0 30px 80px rgba(0,0,0,.6); }
 .map-frame { position: absolute; inset: 18px; border-radius: 16px; border: 3px solid rgba(90, 55, 18, .75);
   box-shadow: inset 0 0 0 6px rgba(217, 192, 142, .9), inset 0 0 0 8px rgba(154, 101, 22, .7); }
-.sea { position: absolute; left: 100px; top: 100px; width: 1200px; height: 1200px; border-radius: 50%; overflow: hidden;
-  background: url("/img/ocean.webp") center / 1200px 1200px;
+.sea { position: absolute; left: 180px; top: 180px; width: 2440px; height: 2440px; border-radius: 50%; overflow: hidden;
+  background: url("/img/ocean.webp") center / 100% 100% no-repeat;
   box-shadow: 0 0 0 9px #5a3712, 0 0 0 13px #d9a033, 0 0 0 16px #5a3712, 0 18px 40px rgba(40, 20, 0, .55); }
-.sea-shimmer { position: absolute; inset: -10%; background: url("/img/ocean.webp") center / 600px 600px; opacity: .22; mix-blend-mode: screen;
-  animation: seaDrift 40s linear infinite; will-change: transform; }
-@keyframes seaDrift { from { transform: translate3d(0,0,0); } to { transform: translate3d(-600px, 300px, 0); } }
+.sea-shimmer { display: none; }
 .sea-depth { position: absolute; inset: 0; border-radius: 50%;
   background: radial-gradient(circle at 50% 50%, rgba(80, 220, 210, .16) 0%, rgba(10, 40, 60, 0) 32%, rgba(4, 18, 32, .5) 100%);
-  box-shadow: inset 0 0 90px rgba(2, 12, 22, .7); }
+  box-shadow: inset 0 0 160px rgba(2, 12, 22, .7); }
 
-.map-svg, .route-svg { position: absolute; inset: 0; width: 1400px; height: 1400px; pointer-events: none; overflow: visible; }
+.map-svg, .route-svg { position: absolute; inset: 0; width: 2800px; height: 2800px; pointer-events: none; overflow: visible; }
+/* scenery: painted rocks, wrecks, sandbars… placed in open water */
+.scenery-layer { position: absolute; inset: 0; pointer-events: none; }
+.scn { position: absolute; transform: translate(-50%, -50%); }
+.scn img { display: block; width: 100%; height: auto; }
+.scn.flip img { transform: scaleX(-1); }
+.scn.kind-sandbar { opacity: .92; }
+.mist { position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(235, 248, 250, .38), rgba(235, 248, 250, 0)); }
+.gulls { position: absolute; width: 150px; pointer-events: none; animation: gullsFly 46s linear infinite; }
+.gulls img { width: 100%; display: block; }
+@keyframes gullsFly { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-1500px, 420px, 0); } }
+.kraken-bob { animation: krakenBob 5s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes krakenBob { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg) translateY(-6px); } }
+/* pause decorative motion while the map is moving, zoomed far out, or off-screen */
+.world.is-moving .ship-art, .world.is-moving .flag i, .world.is-moving .gulls, .world.is-moving .kraken-bob,
+.world.is-moving .whale img, .world.is-moving .whale::before, .world.is-moving .ship-art::before, .world.is-moving .ship.is-mine .ship-body::after,
+.world.is-far .flag i, .off, .off * { animation-play-state: paused !important; }
 
 .islands-layer, .ships-layer, .whale-layer { position: absolute; inset: 0; }
 .ships-layer, .whale-layer { pointer-events: none; }
@@ -224,7 +240,7 @@ img { -webkit-user-drag: none; user-select: none; }
 @keyframes ringPulse { 0%,100% { transform: translate(-50%,-50%) scale(.94); opacity: .7; } 50% { transform: translate(-50%,-50%) scale(1.06); opacity: 1; } }
 
 /* region banners drawn in SVG */
-.region-arc { font-family: var(--display); font-size: 46px; letter-spacing: .5px; }
+.region-arc { font-family: var(--display); font-size: 116px; letter-spacing: 1px; }
 
 /* Whale */
 .whale { position: absolute; width: 132px; transform: translate(-50%, -50%); cursor: pointer; }
@@ -326,7 +342,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .hud-spectate p { font-weight: 700; font-size: 14px; color: var(--text-dim); }
 
 /* ═══════════════ Sheet ═══════════════ */
-.scrim { position: fixed; inset: 0; z-index: 30; background: rgba(2, 8, 12, .55); backdrop-filter: blur(2px); animation: fadeIn .25s ease both; }
+.scrim { position: fixed; inset: 0; z-index: 30; background: rgba(2, 8, 12, .6); animation: fadeIn .25s ease both; }
 .scrim.is-leaving { animation: fadeOut .25s ease both; }
 @keyframes fadeIn { from { opacity: 0; } } @keyframes fadeOut { to { opacity: 0; } }
 .sheet { position: fixed; z-index: 31; left: 0; right: 0; bottom: 0; max-height: 92dvh; max-height: 92vh; display: flex; flex-direction: column;
@@ -538,4 +554,28 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* ───────── my ship dock (bottom-right) ───────── */
+.my-dock { position: absolute; z-index: 11; right: 10px; bottom: calc(var(--hud-h, 180px) + 20px + var(--safe-bot));
+  display: flex; align-items: center; gap: 8px; min-height: 64px; max-width: 220px; padding: 6px 12px 6px 8px; border-radius: 18px;
+  background: linear-gradient(180deg, rgba(14, 40, 52, .96), rgba(6, 20, 28, .96)); box-shadow: inset 0 0 0 1.5px rgba(47, 211, 181, .8), 0 8px 22px rgba(0,0,0,.5);
+  color: var(--text); text-align: right; animation: riseIn .5s var(--ease-out) both; }
+.my-dock[hidden] { display: none; }
+.my-dock .dock-ship { position: relative; width: 62px; height: 58px; flex: none; }
+.my-dock .dock-ship .ship-wrap { position: absolute; left: 0; bottom: 0; width: 62px; }
+.my-dock .dock-ship img { width: 100%; display: block; }
+.my-dock b { display: block; font-family: var(--display); font-weight: 400; font-size: 16px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+.my-dock .dock-gold { display: flex; align-items: center; gap: 4px; font-weight: 800; font-size: 14px; color: var(--gold-2); }
+.my-dock .dock-gold img { width: 16px; height: 16px; }
+.my-dock .dock-tag { font-size: 11px; font-weight: 700; color: var(--teal); }
+@media (min-width: 900px) { .my-dock { right: 16px; bottom: calc(var(--hud-h, 220px) + 30px); } }
+/* mobile performance: no live blur over the moving map, no painted shimmer loops */
+@media (max-width: 899px), (pointer: coarse) {
+  .panel, .tool-btn, .brand-kicker { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  .panel { background: rgba(8, 24, 32, .94); }
+  .tool-btn { background: rgba(6, 18, 25, .92); }
+  .route-path { filter: none; animation: none; stroke-width: 7; }
+  .ship.is-leader .ship-name .nm { animation: none; background-position: 50% 0; }
+  .login-bg { animation: none; }
 }
