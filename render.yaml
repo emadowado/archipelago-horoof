@@ -20,11 +20,9 @@ services:
           name: archipelago-db
           property: connectionString
       - key: ADMIN_PASSWORD
-        generateValue: true   # visible in the Render dashboard > Environment
+        sync: false   # set once in the Render dashboard > Environment (kept secret)
 
 databases:
   - name: archipelago-db
     plan: free
     region: frankfurt
-    databaseName: archipelago
-    user: archipelago

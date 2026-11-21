@@ -38,7 +38,7 @@ NODE_PATH=/path/to/node_modules node tests/e2e.js                      # Playwri
 
 ## النشر على Render
 1. ارفع المستودع على GitHub.
-2. في Render: New ← Blueprint ← اختر المستودع. `render.yaml` ينشئ خدمة ويب مجانية وقاعدة Postgres مجانية `archipelago-db`، ويربط `DATABASE_URL` تلقائياً، ويولّد `ADMIN_PASSWORD` (تلقاه في Environment).
+2. في Render: New ← Blueprint ← اختر المستودع. `render.yaml` ينشئ خدمة ويب مجانية وقاعدة Postgres مجانية `archipelago-db`، ويربط `DATABASE_URL` تلقائياً، ويطلب منك قيمة `ADMIN_PASSWORD` مرة وحدة (تنحفظ في Environment).
 3. ادخل بالاسم `admin` وكلمة المرور، وأنشئ الطواقم من لوحة القبطان أو عدّل الطواقم التجريبية.
 
 قيود الخطة المجانية:
