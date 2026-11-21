@@ -7,7 +7,9 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
 
 const ROOT = path.join(__dirname, "..");
 const overlaps = require("./overlap.js");
-const SHOTS = path.join(ROOT, "screenshots");
+// E2E_SAFE=1 skips steps that change game state (results, reveal, whale) — for a live site
+const SAFE = process.env.E2E_SAFE === "1";
+const SHOTS = process.env.E2E_SHOTS || path.join(ROOT, "screenshots");
 fs.mkdirSync(SHOTS, { recursive: true });
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), "arch-e2e-"));
 const PORT = 19000 + Math.floor(Math.random() * 900);
@@ -64,7 +66,7 @@ async function mapAudit(page, label) {
 
 async function run() {
   await startServer();
-  const ADMIN_PASS = /كلمة المرور: (\S+)/.exec(secrets())[1];
+  const ADMIN_PASS = process.env.E2E_ADMIN_PASS_FILE ? fs.readFileSync(process.env.E2E_ADMIN_PASS_FILE, "utf8").trim() : /كلمة المرور: (\S+)/.exec(secrets())[1];
   const browser = await chromium.launch();
   const errors = []; let expected401 = 0;
   const track = (p, tag) => {
@@ -149,12 +151,13 @@ async function run() {
   await a.tap('.seg[data-team="t1"] button[data-v="right"]');
   await a.screenshot({ path: path.join(SHOTS, "final-admin-answers-mobile.png") });
   await audit(a, "admin mobile (answers tab)");
-  await a.tap("#res-apply"); await a.waitForTimeout(800);
+  if (!SAFE) { await a.tap("#res-apply"); await a.waitForTimeout(800); }
   for (const tab of ["gold", "teams", "players", "log"]) {
     await a.tap(`.adm-tab[data-tab="${tab}"]`); await a.waitForTimeout(300);
     await audit(a, `admin mobile (${tab} tab)`);
     if (tab === "gold") await a.screenshot({ path: path.join(SHOTS, "final-admin-gold-mobile.png") });
   }
+  if (!SAFE) {
   // player gets +3000 and +5 energy live
   await p.waitForFunction((g) => APP.st.myTeam.total === g + 3000, goldBefore, { timeout: 12000 }).then(() => ok(true, "player sees +3,000 live after admin result")).catch(() => ok(false, "player sees +3,000 live after admin result"));
 
@@ -188,6 +191,12 @@ async function run() {
   await p.screenshot({ path: path.join(SHOTS, "final-whale-mobile.png") });
   const wc = p.locator(".cinema-card button"); if (await wc.count()) await wc.tap();
   await p.waitForTimeout(500);
+  } else {
+    // live site: undo the demo team's chosen move so the state is left as found
+    const undo = await p.evaluate(() => fetch("/api/move", { method: "POST", headers: { "content-type": "application/json", "x-requested-with": "arch" }, body: JSON.stringify({ dest: null }) }).then((r) => r.status));
+    ok(undo === 200, "demo move cleared again (safe mode)");
+    await p.waitForTimeout(600);
+  }
 
   // menu + logout
   await p.tap("#btn-menu"); await p.waitForSelector("#m-logout");
