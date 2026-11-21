@@ -1,0 +1,10 @@
+node_modules/
+data/
+*.log
+SECRETS*
+screenshots/
+legacy-v2/
+.env
+.env.*
+*.zip
+.DS_Store
